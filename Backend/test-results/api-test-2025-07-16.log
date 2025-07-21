@@ -1,0 +1,644 @@
+[2025-07-16T18:45:27.864Z] User Login: {
+  "status": 200,
+  "data": {
+    "message": "user login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NCwiZW1haWwiOiJ1c2VyQHRlc3QuY29tIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NTI2OTE1MjcsImV4cCI6MTc1Mjc3NzkyN30.g_9iwUTYUYZjqANQzAgDG6sjfuXQDFQeA5z0kzGy48U",
+    "user": {
+      "id": 4,
+      "username": "testuser",
+      "name": "Test User",
+      "email": "user@test.com",
+      "teamId": 1,
+      "role": "user"
+    }
+  }
+}
+
+[2025-07-16T18:45:27.979Z] Admin Login: {
+  "status": 200,
+  "data": {
+    "message": "admin login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1MjY5MTUyNywiZXhwIjoxNzUyNzc3OTI3fQ.nJsIu9Tr8aN0Z5jxLyNwN9EoMsuowqRKYICUe8_zlg8",
+    "user": {
+      "id": 2,
+      "name": "Admin User",
+      "email": "admin@test.com",
+      "role": "admin"
+    }
+  }
+}
+
+[2025-07-16T18:45:28.085Z] Super Admin Login: {
+  "status": 200,
+  "data": {
+    "message": "super admin login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJzdXBlcmFkbWluQHRlc3QuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzUyNjkxNTI4LCJleHAiOjE3NTI3Nzc5Mjh9.w8Tc_ocrOioUiieSxeqtWFQe9dVqfHsCyNVgiKR52tg",
+    "user": {
+      "id": 2,
+      "name": "Super Admin",
+      "email": "superadmin@test.com",
+      "role": "super_admin"
+    }
+  }
+}
+
+[2025-07-16T18:45:28.109Z] Create Ticket as User: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "",
+        "msg": "Title must be between 5 and 200 characters",
+        "path": "title",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "msg": "Please select a valid ticket type",
+        "path": "type",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "value": "HIGH",
+        "msg": "Please select a valid priority",
+        "path": "priority",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "msg": "Please select a valid category",
+        "path": "category",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "value": "Test Project",
+        "msg": "Please provide a valid project ID",
+        "path": "project",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "msg": "Please select a valid department",
+        "path": "department",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "msg": "Please provide a valid due date",
+        "path": "dueDate",
+        "location": "body"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:45:28.153Z] List Tickets as User: {
+  "status": 500,
+  "data": {}
+}
+
+[2025-07-16T18:45:28.169Z] Get Ticket Details as User: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:45:28.187Z] Approve Ticket as Admin: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:45:28.204Z] Approve Again as Super Admin: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:45:28.225Z] Approve as User: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:45:28.252Z] Get Notifications as Admin: {
+  "status": 200,
+  "data": {
+    "count": 1
+  }
+}
+
+[2025-07-16T18:45:28.271Z] Create Second Ticket: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "",
+        "msg": "Title must be between 5 and 200 characters",
+        "path": "title",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "msg": "Please select a valid ticket type",
+        "path": "type",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "value": "MEDIUM",
+        "msg": "Please select a valid priority",
+        "path": "priority",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "msg": "Please select a valid category",
+        "path": "category",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "value": "Test Project",
+        "msg": "Please provide a valid project ID",
+        "path": "project",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "msg": "Please select a valid department",
+        "path": "department",
+        "location": "body"
+      },
+      {
+        "type": "field",
+        "msg": "Please provide a valid due date",
+        "path": "dueDate",
+        "location": "body"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:45:28.287Z] Reject Ticket as Super Admin: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:48:32.667Z] User Login: {
+  "status": 200,
+  "data": {
+    "message": "user login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NCwiZW1haWwiOiJ1c2VyQHRlc3QuY29tIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NTI2OTE3MTIsImV4cCI6MTc1Mjc3ODExMn0.KuADZrG6t6MWu6RhOcptfCcvrzSPrIwLdeQO_Eiaceg",
+    "user": {
+      "id": 4,
+      "username": "testuser",
+      "name": "Test User",
+      "email": "user@test.com",
+      "teamId": 1,
+      "role": "user"
+    }
+  }
+}
+
+[2025-07-16T18:48:32.775Z] Admin Login: {
+  "status": 200,
+  "data": {
+    "message": "admin login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1MjY5MTcxMiwiZXhwIjoxNzUyNzc4MTEyfQ.lOK_bwrJv9wEy8W361AirrnherRpB_g2RyDmoI0BFZQ",
+    "user": {
+      "id": 2,
+      "name": "Admin User",
+      "email": "admin@test.com",
+      "role": "admin"
+    }
+  }
+}
+
+[2025-07-16T18:48:32.872Z] Super Admin Login: {
+  "status": 200,
+  "data": {
+    "message": "super admin login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJzdXBlcmFkbWluQHRlc3QuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzUyNjkxNzEyLCJleHAiOjE3NTI3NzgxMTJ9.FuC_DswHKpcJEMnFAMIs5g1bW6W-SAOGdNA1aGmuAGc",
+    "user": {
+      "id": 2,
+      "name": "Super Admin",
+      "email": "superadmin@test.com",
+      "role": "super_admin"
+    }
+  }
+}
+
+[2025-07-16T18:48:32.886Z] Create Ticket as User: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "2024-12-31",
+        "msg": "Due date must be in the future",
+        "path": "dueDate",
+        "location": "body"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:48:32.920Z] List Tickets as User: {
+  "status": 500,
+  "data": {}
+}
+
+[2025-07-16T18:48:32.937Z] Get Ticket Details as User: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:48:32.952Z] Approve Ticket as Admin: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:48:32.969Z] Approve Again as Super Admin: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:48:32.988Z] Approve as User: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:48:33.011Z] Get Notifications as Admin: {
+  "status": 200,
+  "data": {
+    "count": 1
+  }
+}
+
+[2025-07-16T18:48:33.025Z] Create Second Ticket: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "2024-12-31",
+        "msg": "Due date must be in the future",
+        "path": "dueDate",
+        "location": "body"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:48:33.039Z] Reject Ticket as Super Admin: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:49:10.165Z] User Login: {
+  "status": 200,
+  "data": {
+    "message": "user login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6NCwiZW1haWwiOiJ1c2VyQHRlc3QuY29tIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NTI2OTE3NTAsImV4cCI6MTc1Mjc3ODE1MH0.nZKxQQlJ4OiuHAmAx54JXy3Lt1lyQ1Ja9plz2hC7W8I",
+    "user": {
+      "id": 4,
+      "username": "testuser",
+      "name": "Test User",
+      "email": "user@test.com",
+      "teamId": 1,
+      "role": "user"
+    }
+  }
+}
+
+[2025-07-16T18:49:10.270Z] Admin Login: {
+  "status": 200,
+  "data": {
+    "message": "admin login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1MjY5MTc1MCwiZXhwIjoxNzUyNzc4MTUwfQ.iQvDC0ccIl-iRmv2uQCRJ0jrqsS-0qLIXlcCFKuBeQw",
+    "user": {
+      "id": 2,
+      "name": "Admin User",
+      "email": "admin@test.com",
+      "role": "admin"
+    }
+  }
+}
+
+[2025-07-16T18:49:10.368Z] Super Admin Login: {
+  "status": 200,
+  "data": {
+    "message": "super admin login successful",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJzdXBlcmFkbWluQHRlc3QuY29tIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzUyNjkxNzUwLCJleHAiOjE3NTI3NzgxNTB9.mxQzOezhRqvpIsefmegZG4E7GHck5n1P5RebDKf9cUQ",
+    "user": {
+      "id": 2,
+      "name": "Super Admin",
+      "email": "superadmin@test.com",
+      "role": "super_admin"
+    }
+  }
+}
+
+[2025-07-16T18:49:10.401Z] Create Ticket as User: {
+  "status": 500,
+  "data": {
+    "error": "Failed to create ticket",
+    "message": "notNull Violation: Ticket.taskName cannot be null"
+  }
+}
+
+[2025-07-16T18:49:10.431Z] List Tickets as User: {
+  "status": 500,
+  "data": {}
+}
+
+[2025-07-16T18:49:10.448Z] Get Ticket Details as User: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:49:10.464Z] Approve Ticket as Admin: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:49:10.480Z] Approve Again as Super Admin: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:49:10.498Z] Approve as User: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:49:10.522Z] Get Notifications as Admin: {
+  "status": 200,
+  "data": {
+    "count": 1
+  }
+}
+
+[2025-07-16T18:49:10.546Z] Create Second Ticket: {
+  "status": 500,
+  "data": {
+    "error": "Failed to create ticket",
+    "message": "notNull Violation: Ticket.taskName cannot be null"
+  }
+}
+
+[2025-07-16T18:49:10.561Z] Reject Ticket as Super Admin: {
+  "status": 400,
+  "data": {
+    "error": "Validation failed",
+    "details": [
+      {
+        "type": "field",
+        "value": "undefined",
+        "msg": "Please provide a valid ID",
+        "path": "id",
+        "location": "params"
+      }
+    ]
+  }
+}
+
+[2025-07-16T18:53:19.257Z] User Login: {
+  "status": 401,
+  "data": {
+    "error": "Invalid credentials"
+  }
+}
+
+[2025-07-16T18:53:19.283Z] Admin Login: {
+  "status": 401,
+  "data": {
+    "error": "Invalid credentials"
+  }
+}
+
+[2025-07-16T18:53:19.303Z] Super Admin Login: {
+  "status": 401,
+  "data": {
+    "error": "Invalid credentials"
+  }
+}
+
+[2025-07-16T18:53:19.315Z] Create Ticket as User: {
+  "status": 401,
+  "data": {
+    "error": "Invalid token."
+  }
+}
+
+[2025-07-16T18:53:19.325Z] List Tickets as User: {
+  "status": 401,
+  "data": {}
+}
+
+[2025-07-16T18:53:19.339Z] Get Ticket Details as User: {
+  "status": 401,
+  "data": {
+    "error": "Invalid token."
+  }
+}
+
+[2025-07-16T18:53:19.353Z] Approve Ticket as Admin: {
+  "status": 401,
+  "data": {
+    "error": "Invalid token."
+  }
+}
+
+[2025-07-16T18:53:19.365Z] Approve Again as Super Admin: {
+  "status": 401,
+  "data": {
+    "error": "Invalid token."
+  }
+}
+
+[2025-07-16T18:53:19.380Z] Approve as User: {
+  "status": 401,
+  "data": {
+    "error": "Invalid token."
+  }
+}
+
+[2025-07-16T18:53:19.389Z] Get Notifications as Admin: {
+  "status": 401,
+  "data": {}
+}
+
+[2025-07-16T18:53:19.400Z] Create Second Ticket: {
+  "status": 401,
+  "data": {
+    "error": "Invalid token."
+  }
+}
+
+[2025-07-16T18:53:19.410Z] Reject Ticket as Super Admin: {
+  "status": 401,
+  "data": {
+    "error": "Invalid token."
+  }
+}
+
