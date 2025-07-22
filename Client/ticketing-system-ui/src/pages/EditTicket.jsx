@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import {
   Ticket,
@@ -37,7 +38,7 @@ const EditTicket = () => {
   const fetchTicket = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`http://localhost:5000/api/tickets/${id}`);
+      const response = await axios.get(getApiUrl(`/api/tickets/${id}`));
       const ticketData = response.data.ticket;
       setTicket(ticketData);
       
@@ -73,9 +74,9 @@ const EditTicket = () => {
     try {
       // Fetch teams, users, and projects for dropdowns using the correct endpoints
       const [teamsRes, usersRes, projectsRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/teams/dropdown'),
-        axios.get('http://localhost:5000/api/users/for-tickets'),
-        axios.get('http://localhost:5000/api/projects/dropdown')
+        axios.get(getApiUrl('/api/teams/dropdown')),
+        axios.get(getApiUrl('/api/users/for-tickets')),
+        axios.get(getApiUrl('/api/projects/dropdown'))
       ]);
 
       setTeams(teamsRes.data.teams || []);
@@ -119,7 +120,7 @@ const EditTicket = () => {
         priority: formData.priority
       };
 
-      await axios.put(`http://localhost:5000/api/tickets/${id}`, ticketData);
+      await axios.put(getApiUrl(`/api/tickets/${id}`), ticketData);
 
       toast.success('Ticket updated successfully!');
       navigate(`/tickets/${id}`);

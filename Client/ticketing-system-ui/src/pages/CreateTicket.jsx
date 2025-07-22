@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../contexts/AuthContext';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import {
   Ticket,
@@ -141,7 +142,7 @@ const CreateTicket = () => {
       console.log('Using auth token:', token ? 'Token exists' : 'No token');
 
       // Use axios directly with explicit headers
-      const response = await axios.post('http://localhost:5000/api/tickets', ticketData, { headers });
+      const response = await axios.post(getApiUrl('/api/tickets'), ticketData, { headers });
 
       console.log('Ticket creation response:', response.data);
       toast.success('Ticket created successfully! It will be reviewed by administrators.');

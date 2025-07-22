@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 import {
   Ticket,
   Users,
@@ -32,11 +33,11 @@ const Dashboard = () => {
       setLoading(true);
       
       // Fetch dashboard statistics
-      const statsResponse = await axios.get('http://localhost:5000/api/tickets/stats');
+      const statsResponse = await axios.get(getApiUrl('/api/tickets/stats'));
       setStats(statsResponse.data);
 
       // Fetch recent tickets
-      const ticketsResponse = await axios.get('http://localhost:5000/api/tickets?limit=5&sort=createdAt&order=desc');
+      const ticketsResponse = await axios.get(getApiUrl('/api/tickets?limit=5&sort=createdAt&order=desc'));
       setRecentTickets(ticketsResponse.data.tickets);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);

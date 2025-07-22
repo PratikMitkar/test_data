@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { UserPlus, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../config/api';
 
 const CreateAdmin = () => {
   const [formData, setFormData] = useState({
@@ -39,7 +40,7 @@ const CreateAdmin = () => {
     setLoading(true);
 
     try {
-      await axios.post('http://localhost:5000/api/auth/register/admin', {
+      await axios.post(getApiUrl('/api/auth/register/admin'), {
         name: formData.name,
         email: formData.email,
         password: formData.password

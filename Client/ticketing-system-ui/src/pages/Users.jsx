@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../config/api';
 import {
   Users as UsersIcon,
   UserPlus,
@@ -42,8 +43,8 @@ const UsersPage = () => {
       
       // Fetch all user types and teams
       const [usersRes, teamsRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/users/all'),
-        axios.get('http://localhost:5000/api/users/teams')
+        axios.get(getApiUrl('/api/users/all')),
+        axios.get(getApiUrl('/api/users/teams'))
       ]);
       
       setUsers(usersRes.data.users || []);
@@ -81,7 +82,7 @@ const UsersPage = () => {
       
       if (createType === 'admin') {
         // Create admin (only super admin can do this)
-        await axios.post('http://localhost:5000/api/auth/register/admin', {
+        await axios.post(getApiUrl('/api/auth/register/admin'), {
           name: formData.name,
           email: formData.email,
           password: formData.password,
@@ -90,7 +91,7 @@ const UsersPage = () => {
         toast.success('Admin created successfully');
       } else if (createType === 'member') {
         // Create member (team can do this)
-        await axios.post('http://localhost:5000/api/auth/register/user', {
+        await axios.post(getApiUrl('/api/auth/register/user'), {
           username: formData.username,
           name: formData.name,
           email: formData.email,
@@ -123,7 +124,7 @@ const UsersPage = () => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/users/${userId}`);
+              await axios.delete(getApiUrl(`/api/users/${userId}`));
       toast.success('User deleted successfully');
       fetchData();
     } catch (error) {

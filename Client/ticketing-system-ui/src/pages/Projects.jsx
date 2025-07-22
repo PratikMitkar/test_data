@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { getApiUrl } from '../config/api';
 import {
   FolderOpen,
   Plus,
@@ -48,7 +49,7 @@ const Projects = () => {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:5000/api/projects');
+      const response = await axios.get(getApiUrl('/api/projects'));
       
       // If user is a team manager, filter projects to only show their team's projects
       if (user?.role === 'team') {
@@ -69,7 +70,7 @@ const Projects = () => {
   
   const fetchTeams = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/teams/dropdown');
+      const response = await axios.get(getApiUrl('/api/teams/dropdown'));
       setTeams(response.data.teams || []);
     } catch (error) {
       console.error('Error fetching teams:', error);
@@ -118,7 +119,7 @@ const Projects = () => {
         delete projectData.endDate;
       }
       
-      await axios.post('http://localhost:5000/api/projects', projectData);
+      await axios.post(getApiUrl('/api/projects'), projectData);
       toast.success('Project created successfully');
       setShowCreateModal(false);
       
@@ -186,7 +187,7 @@ const Projects = () => {
         delete projectData.endDate;
       }
       
-      await axios.put(`http://localhost:5000/api/projects/${currentProject.id}`, projectData);
+      await axios.put(getApiUrl(`/api/projects/${currentProject.id}`), projectData);
       toast.success('Project updated successfully');
       setShowEditModal(false);
       fetchProjects();
@@ -206,7 +207,7 @@ const Projects = () => {
     if (!window.confirm('Are you sure you want to delete this project?')) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/projects/${projectId}`);
+      await axios.delete(getApiUrl(`/api/projects/${projectId}`));
       toast.success('Project deleted successfully');
       fetchProjects();
     } catch (error) {

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { UserPlus, Mail, Lock, User, Users, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../config/api';
 
 const CreateMember = () => {
   const [formData, setFormData] = useState({
@@ -38,7 +39,7 @@ const CreateMember = () => {
   const fetchTeams = async () => {
     try {
       setFetchingTeams(true);
-      const response = await axios.get('http://localhost:5000/api/teams');
+      const response = await axios.get(getApiUrl('/api/teams'));
       setTeams(response.data.teams || []);
       
       // If user is a team, auto-select their team
@@ -74,7 +75,7 @@ const CreateMember = () => {
     setLoading(true);
 
     try {
-      await axios.post('http://localhost:5000/api/auth/register/user', {
+      await axios.post(getApiUrl('/api/auth/register/user'), {
         username: formData.username,
         name: formData.name,
         email: formData.email,

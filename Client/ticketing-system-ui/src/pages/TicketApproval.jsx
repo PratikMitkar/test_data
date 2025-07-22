@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../config/api';
 
 const TicketApproval = () => {
   const { user } = useAuth();
@@ -51,7 +52,7 @@ const TicketApproval = () => {
 
   const fetchTickets = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/tickets?status=${filterStatus}&limit=50`);
+      const response = await axios.get(getApiUrl(`/api/tickets?status=${filterStatus}&limit=50`));
       setTickets(response.data.tickets || []);
     } catch (error) {
       console.error('Failed to fetch tickets:', error);
@@ -78,7 +79,7 @@ const TicketApproval = () => {
         updateData.rejectionReason = approvalData.rejectionReason;
       }
 
-      await axios.put(`http://localhost:5000/api/tickets/${selectedTicket.id}`, updateData);
+      await axios.put(getApiUrl(`/api/tickets/${selectedTicket.id}`), updateData);
 
       toast.success(`Ticket ${approvalData.action === 'approve' ? 'approved' : 'rejected'} successfully!`);
       

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Users, Plus, Mail, User, Calendar, Search, Filter } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../config/api';
 
 const Teams = () => {
   const [teams, setTeams] = useState([]);
@@ -18,7 +19,7 @@ const Teams = () => {
 
   const fetchTeams = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/teams');
+      const response = await axios.get(getApiUrl('/api/teams'));
       setTeams(response.data.teams || []);
     } catch (error) {
       console.error('Failed to fetch teams:', error);
@@ -42,7 +43,7 @@ const Teams = () => {
 
   const toggleTeamStatus = async (teamId, currentStatus) => {
     try {
-      await axios.put(`http://localhost:5000/api/teams/${teamId}/status`, {
+              await axios.put(getApiUrl(`/api/teams/${teamId}/status`), {
         isActive: !currentStatus
       });
       

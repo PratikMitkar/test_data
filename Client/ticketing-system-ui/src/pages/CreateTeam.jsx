@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Users, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../config/api';
 
 const CreateTeam = () => {
   const [formData, setFormData] = useState({
@@ -40,7 +41,7 @@ const CreateTeam = () => {
     setLoading(true);
 
     try {
-      await axios.post('http://localhost:5000/api/auth/register/team', {
+      await axios.post(getApiUrl('/api/auth/register/team'), {
         teamName: formData.teamName,
         managerName: formData.managerName,
         email: formData.email,

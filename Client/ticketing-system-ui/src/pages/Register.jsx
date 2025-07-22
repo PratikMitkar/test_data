@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { UserPlus, Mail, Lock, User, Building, Shield, Crown, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { getApiUrl } from '../config/api';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -92,7 +93,7 @@ const Register = () => {
           return;
       }
 
-      const response = await axios.post(`http://localhost:5000${endpoint}`, payload);
+      const response = await axios.post(getApiUrl(endpoint), payload);
       
       toast.success('Registration successful! Please login.');
       navigate('/login');
@@ -114,7 +115,7 @@ const Register = () => {
 
   const fetchTeams = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/users/teams');
+      const response = await axios.get(getApiUrl('/api/users/teams'));
       setTeams(response.data);
     } catch (error) {
       console.error('Error fetching teams:', error);
@@ -123,7 +124,7 @@ const Register = () => {
 
   const fetchSuperAdmins = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/users/super-admins');
+      const response = await axios.get(getApiUrl('/api/users/super-admins'));
       setSuperAdmins(response.data);
     } catch (error) {
       console.error('Error fetching super admins:', error);

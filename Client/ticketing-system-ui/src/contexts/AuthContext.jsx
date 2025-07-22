@@ -1,12 +1,10 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { api, API_BASE_URL } from '../config/api';
 
-// Create axios instance with base URL
-export const api = axios.create({
-  baseURL: 'http://localhost:5000',
-  withCredentials: true
-});
+// Re-export api for backward compatibility
+export { api };
 
 const AuthContext = createContext();
 

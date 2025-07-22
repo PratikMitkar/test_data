@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 import toast from 'react-hot-toast';
 import {
   Search,
@@ -58,7 +59,7 @@ const Tickets = () => {
         params.append('userId', user.id);
       }
 
-      const response = await axios.get(`http://localhost:5000/api/tickets?${params}`);
+      const response = await axios.get(getApiUrl(`/api/tickets?${params}`));
       setTickets(response.data.tickets);
       setPagination(response.data.pagination);
     } catch (error) {
@@ -90,7 +91,7 @@ const Tickets = () => {
         rejectionReason: approvalData.rejectionReason
       };
 
-      await axios.put(`http://localhost:5000/api/tickets/${selectedTicket.id}/approve`, data);
+              await axios.put(getApiUrl(`/api/tickets/${selectedTicket.id}/approve`), data);
 
       toast.success(approvalData.approved ? 'Ticket approved successfully' : 'Ticket rejected');
       setShowApprovalModal(false);

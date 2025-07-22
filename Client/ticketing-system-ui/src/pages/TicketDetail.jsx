@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { getApiUrl } from '../config/api';
 import {
   FileText,
   CheckCircle,
@@ -39,7 +40,7 @@ const TicketDetail = () => {
   const fetchTicket = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`http://localhost:5000/api/tickets/${id}`);
+      const response = await axios.get(getApiUrl(`/api/tickets/${id}`));
       setTicket(response.data.ticket);
       
       // Initialize approval data with ticket values
@@ -62,7 +63,7 @@ const TicketDetail = () => {
   const handleStatusUpdate = async (newStatus) => {
     try {
       setSubmitting(true);
-      await axios.patch(`http://localhost:5000/api/tickets/${id}/status`, {
+      await axios.patch(getApiUrl(`/api/tickets/${id}/status`), {
         status: newStatus
       });
       toast.success('Ticket status updated successfully');
@@ -92,7 +93,7 @@ const TicketDetail = () => {
         updateData.rejectionReason = approvalData.rejectionReason;
       }
 
-      await axios.put(`http://localhost:5000/api/tickets/${id}`, updateData);
+      await axios.put(getApiUrl(`/api/tickets/${id}`), updateData);
 
       toast.success(`Ticket ${approvalData.action === 'approve' ? 'approved' : 'rejected'} successfully!`);
       setShowApprovalModal(false);

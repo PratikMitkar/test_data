@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import { getApiUrl } from '../config/api';
 
 const NotificationContext = createContext();
 
@@ -34,7 +35,7 @@ export const NotificationProvider = ({ children }) => {
       setLoading(true);
       
       // Call the backend API to get notifications
-      const response = await axios.get(`http://localhost:5000/api/notifications`, {
+      const response = await axios.get(getApiUrl('/api/notifications'), {
         params: { limit, page },
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
@@ -94,7 +95,7 @@ export const NotificationProvider = ({ children }) => {
     
     try {
       // Call the backend API to get unread count
-      const response = await axios.get(`http://localhost:5000/api/notifications/unread-count`, {
+      const response = await axios.get(getApiUrl('/api/notifications/unread-count'), {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -109,7 +110,7 @@ export const NotificationProvider = ({ children }) => {
   const markAsRead = useCallback(async (notificationId) => {
     try {
       // Call the backend API to mark notification as read
-      await axios.put(`http://localhost:5000/api/notifications/${notificationId}/read`, {}, {
+      await axios.put(getApiUrl(`/api/notifications/${notificationId}/read`), {}, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -137,7 +138,7 @@ export const NotificationProvider = ({ children }) => {
   const markAllAsRead = useCallback(async () => {
     try {
       // Call the backend API to mark all notifications as read
-      await axios.put(`http://localhost:5000/api/notifications/read-all`, {}, {
+      await axios.put(getApiUrl(`/api/notifications/read-all`), {}, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
@@ -161,7 +162,7 @@ export const NotificationProvider = ({ children }) => {
   const deleteNotification = useCallback(async (notificationId) => {
     try {
       // Call the backend API to delete notification
-      await axios.delete(`http://localhost:5000/api/notifications/${notificationId}`, {
+      await axios.delete(getApiUrl(`/api/notifications/${notificationId}`), {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
         }
