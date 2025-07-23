@@ -288,14 +288,14 @@ const CreateTicket = () => {
                 className="flex h-10 w-full rounded-xl border border-[#dbdbdb] bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
                 required
               >
-                <option value="technical">Technical</option>
-                <option value="business">Business</option>
-                <option value="infrastructure">Infrastructure</option>
-                <option value="security">Security</option>
-                <option value="performance">Performance</option>
-                <option value="ui/ux">UI/UX</option>
-                <option value="database">Database</option>
-                <option value="api">API</option>
+                <option value="Hardware">Hardware</option>
+                <option value="Software">Software</option>
+                <option value="Tools">Tools</option>
+                <option value="Lab Support">Lab Support</option>
+                <option value="Purchase">Purchase</option>
+                <option value="ASPICE">ASPICE</option>
+                <option value="Functional Safety">Functional Safety</option>
+                <option value="Cyber sec">Cyber sec</option>
               </select>
             </div>
           </div>
