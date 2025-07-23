@@ -22,8 +22,12 @@ Team.belongsTo(Admin, { foreignKey: 'adminId', as: 'admin' });
 Team.hasMany(User, { foreignKey: 'teamId', as: 'users' });
 User.belongsTo(Team, { foreignKey: 'teamId', as: 'team' });
 
-Team.hasMany(Ticket, { foreignKey: 'teamId', as: 'tickets' });
-Ticket.belongsTo(Team, { foreignKey: 'teamId', as: 'team' });
+// Ticket associations with teams
+Team.hasMany(Ticket, { foreignKey: 'teamId', as: 'createdTickets' });
+Ticket.belongsTo(Team, { foreignKey: 'teamId', as: 'creatorTeam' });
+
+Team.hasMany(Ticket, { foreignKey: 'assignedTeamId', as: 'assignedTickets' });
+Ticket.belongsTo(Team, { foreignKey: 'assignedTeamId', as: 'assignedTeam' });
 
 // User associations
 User.hasMany(Ticket, { foreignKey: 'createdBy', as: 'createdTickets' });

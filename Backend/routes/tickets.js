@@ -10,16 +10,17 @@ const Project = require('../models/Project');
 const Notification = require('../models/Notification');
 const SuperAdmin = require('../models/SuperAdmin');
 const Admin = require('../models/Admin');
-const { 
-  authenticateToken, 
+const NotificationService = require('../services/notificationService');
+const {
+  authenticateToken,
   isManagerOrAdmin,
-  isAdmin 
+  isAdmin
 } = require('../middleware/auth');
-const { 
+const {
   validateTicketCreation,
   validateTicketUpdate,
   validatePagination,
-  validateId 
+  validateId
 } = require('../middleware/validation');
 
 const router = express.Router();
@@ -48,7 +49,7 @@ const upload = multer({
     const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|txt|zip|rar/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-    
+
     if (mimetype && extname) {
       return cb(null, true);
     } else {
@@ -64,11 +65,11 @@ const checkUserPermissions = async (user) => {
     const admin = await Admin.findOne({ where: { email: user.email } });
     const superAdmin = await SuperAdmin.findOne({ where: { email: user.email } });
     const team = await Team.findOne({ where: { email: user.email } });
-    
+
     if (admin) return { role: 'admin', adminId: admin.id };
     if (superAdmin) return { role: 'super_admin', superAdminId: superAdmin.id };
     if (team) return { role: 'team', teamId: team.id };
-    
+
     return { role: 'user' };
   } catch (error) {
     console.error('Error checking user permissions:', error);
@@ -83,13 +84,13 @@ router.post('/', authenticateToken, validateTicketCreation, upload.array('attach
       title,
       description,
       teamId,
+      assignedTeamId,
       assignedTo,
       priority,
       projectId,
       expectedClosure,
       type,
       category,
-      department,
       dueDate
     } = req.body;
 
@@ -142,12 +143,13 @@ router.post('/', authenticateToken, validateTicketCreation, upload.array('attach
 
     // Check user permissions
     const userPermissions = await checkUserPermissions(req.user);
-    
+
     // Create ticket with explicit user ID
     const ticketData = {
       title,
       description,
       teamId,
+      assignedTeamId: assignedTeamId || teamId, // Use assigned team or default to creator team
       createdBy: req.user.id, // This should be set by now
       assignedTo: assignedTo || null,
       priority: priority || 'MEDIUM',
@@ -156,10 +158,9 @@ router.post('/', authenticateToken, validateTicketCreation, upload.array('attach
       expectedClosure: expectedClosure || null,
       type,
       category,
-      department,
       dueDate
     };
-    
+
     console.log('Final ticket data being saved:', ticketData);
 
     // Handle file uploads
@@ -176,49 +177,26 @@ router.post('/', authenticateToken, validateTicketCreation, upload.array('attach
 
     const ticket = await Ticket.create(ticketData);
 
-    // Create notification for all admins and super admins
-    const admins = await Admin.findAll();
-    const superAdmins = await SuperAdmin.findAll();
-    const notifications = [];
-    for (const admin of admins) {
-      notifications.push(Notification.create({
-        userId: admin.id,
-        title: 'New Ticket Created',
-        message: `A new ticket "${title}" has been created and needs your approval`,
-        type: 'ticket_created',
-        priority: 'medium',
-        isRead: false,
-        ticketId: ticket.id
-      }));
-    }
-    for (const superAdmin of superAdmins) {
-      notifications.push(Notification.create({
-        userId: superAdmin.id,
-        title: 'New Ticket Created',
-        message: `A new ticket "${title}" has been created and needs your approval`,
-        type: 'ticket_created',
-        priority: 'medium',
-        isRead: false,
-        ticketId: ticket.id
-      }));
-    }
-    await Promise.all(notifications);
+    // Use the notification service to create notifications
+    const NotificationService = require('../services/notificationService');
 
-    // Create notification for team manager
-    if (userPermissions.role === 'user') {
-      const team = await Team.findByPk(teamId);
-      if (team) {
-        await Notification.create({
-          userId: team.id, // Notify team
-          title: 'New Ticket Created',
-          message: `A new ticket "${title}" has been created in your team`,
-          type: 'ticket_created',
-          priority: 'medium',
-          isRead: false,
-          ticketId: ticket.id
-        });
-      }
-    }
+    await NotificationService.createTicketNotification({
+      ticketId: ticket.id,
+      ticketTitle: title,
+      type: 'TICKET_CREATED',
+      message: `A new ticket "${title}" has been created and needs your approval`,
+      // Send to admins and super admins for approval
+      sendToAdmins: true,
+      sendToSuperAdmins: true,
+      // If created by a user, notify their team manager
+      sendToTeamManager: userPermissions.role === 'user',
+      // If assigned to a different team, notify that team's manager
+      sendToAssignedTeamManager: assignedTeamId && assignedTeamId !== teamId,
+      teamId: teamId,
+      assignedTeamId: assignedTeamId,
+      creatorId: req.user.id,
+      priority: priority || 'medium'
+    });
 
     res.status(201).json({
       message: 'Ticket created successfully',
@@ -228,6 +206,436 @@ router.post('/', authenticateToken, validateTicketCreation, upload.array('attach
     console.error('Create ticket error:', error);
     res.status(500).json({
       error: 'Failed to create ticket',
+      message: error.message
+    });
+  }
+});
+
+// Get tickets that need approval from current user (Admin, Super Admin, or Team Manager)
+router.get('/approval-tasks', authenticateToken, validatePagination, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status = 'PENDING_APPROVAL',
+      priority,
+      search,
+      sort = 'createdAt',
+      order = 'desc'
+    } = req.query;
+
+    // Check user permissions
+    const userPermissions = await checkUserPermissions(req.user);
+
+    // Build where clause for tickets that need approval
+    let whereClause = {};
+
+    if (userPermissions.role === 'super_admin') {
+      // Super admin can see all tickets that need approval
+      whereClause.status = status;
+    } else if (userPermissions.role === 'admin') {
+      // Admin can see all tickets that need approval
+      whereClause.status = status;
+    } else if (userPermissions.role === 'team') {
+      // Team manager can see tickets assigned to their team
+      const team = await Team.findOne({ where: { email: req.user.email } });
+      if (team) {
+        // Show tickets assigned to the team based on status
+        if (status === 'PENDING_APPROVAL') {
+          // Show tickets needing manager approval
+          whereClause = {
+            assignedTeamId: team.id,
+            status: 'PENDING_APPROVAL'
+          };
+        } else if (status === 'APPROVED') {
+          // Show approved tickets that are not yet assigned to a team member
+          whereClause = {
+            assignedTeamId: team.id,
+            status: 'APPROVED',
+            assignedTo: null
+          };
+        } else if (status === 'IN_PROGRESS') {
+          // Show tickets that are assigned to team members and in progress
+          whereClause = {
+            assignedTeamId: team.id,
+            status: 'IN_PROGRESS'
+          };
+        } else if (status === 'COMPLETED') {
+          // Show completed tickets from the team
+          whereClause = {
+            assignedTeamId: team.id,
+            status: 'COMPLETED'
+          };
+        } else if (status === 'REJECTED') {
+          // Show rejected tickets
+          whereClause = {
+            assignedTeamId: team.id,
+            status: 'REJECTED'
+          };
+        } else {
+          // Show all tickets assigned to the team
+          whereClause = {
+            assignedTeamId: team.id
+          };
+        }
+      } else {
+        // If team not found, return empty results
+        whereClause = { id: -1 };
+      }
+    } else {
+      // Regular users cannot access approval tasks
+      return res.status(403).json({
+        error: 'Access denied. Only administrators and team managers can access approval tasks.'
+      });
+    }
+
+    if (priority) whereClause.priority = priority;
+
+    // Search functionality
+    if (search) {
+      whereClause[Op.or] = [
+        { title: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
+        { project: { [Op.like]: `%${search}%` } }
+      ];
+    }
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const orderClause = [[sort, order.toUpperCase()]];
+
+    const { count, rows: tickets } = await Ticket.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: User,
+          as: 'assignedUser',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: User,
+          as: 'approver',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: Team,
+          as: 'creatorTeam',
+          attributes: ['id', 'teamName']
+        },
+        {
+          model: Team,
+          as: 'assignedTeam',
+          attributes: ['id', 'teamName']
+        },
+        {
+          model: Project,
+          as: 'projectRef',
+          attributes: ['id', 'name', 'code']
+        }
+      ],
+      order: orderClause,
+      limit: parseInt(limit),
+      offset: offset
+    });
+
+    res.json({
+      tickets,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        pages: Math.ceil(count / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Get approval tasks error:', error);
+    res.status(500).json({
+      error: 'Failed to get approval tasks',
+      message: error.message
+    });
+  }
+});
+
+// Assign ticket to team member (Team Manager only)
+router.put('/:id/assign-member', authenticateToken, validateId, async (req, res) => {
+  try {
+    const { assignedTo } = req.body;
+
+    if (!assignedTo) {
+      return res.status(400).json({
+        error: 'assignedTo is required'
+      });
+    }
+
+    const ticket = await Ticket.findByPk(req.params.id);
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: 'Ticket not found'
+      });
+    }
+
+    // Check if user is team manager for the assigned team
+    const userPermissions = await checkUserPermissions(req.user);
+
+    if (userPermissions.role === 'team') {
+      const team = await Team.findOne({ where: { email: req.user.email } });
+      if (!team || ticket.assignedTeamId !== team.id) {
+        return res.status(403).json({
+          error: 'Access denied. You can only assign tickets assigned to your team.'
+        });
+      }
+    } else if (userPermissions.role !== 'admin' && userPermissions.role !== 'super_admin') {
+      return res.status(403).json({
+        error: 'Access denied. Only team managers, admins, and super admins can assign tickets to team members.'
+      });
+    }
+
+    // Handle assignment logic based on user role
+    if (userPermissions.role === 'team') {
+      const team = await Team.findOne({ where: { email: req.user.email } });
+      
+      // Check if assigning to team manager themselves (using team ID)
+      if (parseInt(assignedTo) === team.id) {
+        // Team manager is assigning to themselves
+        // This is allowed - we'll use the team ID as the assignedTo value
+        console.log('Team manager assigning ticket to themselves');
+      } else {
+        // Assigning to a regular team member
+        const assignedUser = await User.findByPk(assignedTo);
+        
+        if (!assignedUser) {
+          return res.status(404).json({
+            error: 'Assigned user not found'
+          });
+        }
+
+        if (assignedUser.teamId !== ticket.assignedTeamId) {
+          return res.status(400).json({
+            error: 'User must belong to the assigned team'
+          });
+        }
+      }
+    } else if (userPermissions.role === 'admin' || userPermissions.role === 'super_admin') {
+      // Admins and super admins can assign to anyone in the assigned team
+      const assignedUser = await User.findByPk(assignedTo);
+      
+      if (!assignedUser) {
+        return res.status(404).json({
+          error: 'Assigned user not found'
+        });
+      }
+
+      if (assignedUser.teamId !== ticket.assignedTeamId) {
+        return res.status(400).json({
+          error: 'User must belong to the assigned team'
+        });
+      }
+    }
+
+    // Update ticket with assigned user
+    await ticket.update({
+      assignedTo: assignedTo,
+      assignedBy: req.user.id,
+      assignedAt: new Date()
+    });
+
+    // Use the notification service to create notifications
+    const NotificationService = require('../services/notificationService');
+
+    // Determine the appropriate message based on who is being assigned
+    let notificationMessage;
+    if (userPermissions.role === 'team') {
+      const team = await Team.findOne({ where: { email: req.user.email } });
+      if (parseInt(assignedTo) === team.id) {
+        notificationMessage = `You have assigned ticket "${ticket.title}" to yourself`;
+      } else {
+        notificationMessage = `You have been assigned ticket "${ticket.title}" by your team manager`;
+      }
+    } else {
+      notificationMessage = `You have been assigned ticket "${ticket.title}" by an administrator`;
+    }
+
+    await NotificationService.createTicketNotification({
+      ticketId: ticket.id,
+      ticketTitle: ticket.title,
+      type: 'TICKET_ASSIGNED',
+      message: notificationMessage,
+      recipientId: assignedTo, // Send directly to the assigned user
+      priority: 'medium'
+    });
+
+    const updatedTicket = await Ticket.findByPk(req.params.id, {
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: User,
+          as: 'assignedUser',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: User,
+          as: 'approver',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: Team,
+          as: 'creatorTeam',
+          attributes: ['id', 'teamName']
+        },
+        {
+          model: Team,
+          as: 'assignedTeam',
+          attributes: ['id', 'teamName']
+        },
+        {
+          model: Project,
+          as: 'projectRef',
+          attributes: ['id', 'name', 'code']
+        }
+      ]
+    });
+
+    res.json({
+      message: 'Ticket assigned to team member successfully',
+      ticket: updatedTicket
+    });
+  } catch (error) {
+    console.error('Assign ticket to member error:', error);
+    res.status(500).json({
+      error: 'Failed to assign ticket to team member',
+      message: error.message
+    });
+  }
+});
+
+// Get tickets assigned to current user by other teams
+router.get('/assigned', authenticateToken, validatePagination, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      priority,
+      search,
+      sort = 'createdAt',
+      order = 'desc'
+    } = req.query;
+
+    // Check user permissions to determine how to filter tickets
+    const userPermissions = await checkUserPermissions(req.user);
+    
+    // Build where clause for tickets assigned to current user
+    let whereClause;
+    
+    if (userPermissions.role === 'team') {
+      // For team managers, only show tickets specifically assigned to them as individuals
+      // This ensures they only see tickets that were explicitly assigned to them
+      const team = await Team.findOne({ where: { email: req.user.email } });
+      
+      // Find the user record for the team manager (if it exists)
+      const teamManagerUser = await User.findOne({ where: { email: req.user.email } });
+      
+      if (teamManagerUser) {
+        // If team manager has a user record, show tickets assigned to their user ID
+        whereClause = {
+          assignedTo: teamManagerUser.id,
+          // Exclude tickets created by the current user (only show tickets assigned by others)
+          createdBy: { [Op.ne]: req.user.id }
+        };
+      } else {
+        // If team manager doesn't have a user record, show tickets assigned to their team ID
+        // but only when explicitly assigned to the team manager (not the whole team)
+        whereClause = {
+          assignedTo: team ? team.id : null,
+          // Exclude tickets created by the current user (only show tickets assigned by others)
+          createdBy: { [Op.ne]: req.user.id }
+        };
+      }
+    } else {
+      // For regular users, show tickets assigned to their user ID only
+      whereClause = {
+        assignedTo: req.user.id,
+        // Exclude tickets created by the current user (only show tickets assigned by others)
+        createdBy: { [Op.ne]: req.user.id }
+      };
+    }
+
+    if (status) whereClause.status = status;
+    if (priority) whereClause.priority = priority;
+
+    // Search functionality
+    if (search) {
+      whereClause[Op.or] = [
+        { title: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } },
+        { project: { [Op.like]: `%${search}%` } }
+      ];
+    }
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const orderClause = [[sort, order.toUpperCase()]];
+
+    const { count, rows: tickets } = await Ticket.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: User,
+          as: 'assignedUser',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: User,
+          as: 'approver',
+          attributes: ['id', 'name', 'email']
+        },
+        {
+          model: Team,
+          as: 'creatorTeam',
+          attributes: ['id', 'teamName']
+        },
+        {
+          model: Team,
+          as: 'assignedTeam',
+          attributes: ['id', 'teamName']
+        },
+        {
+          model: Project,
+          as: 'projectRef',
+          attributes: ['id', 'name', 'code']
+        }
+      ],
+      order: orderClause,
+      limit: parseInt(limit),
+      offset: offset
+    });
+
+    res.json({
+      tickets,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: count,
+        pages: Math.ceil(count / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Get assigned tickets error:', error);
+    res.status(500).json({
+      error: 'Failed to get assigned tickets',
       message: error.message
     });
   }
@@ -254,7 +662,7 @@ router.get('/', authenticateToken, validatePagination, async (req, res) => {
 
     // Build where clause
     const whereClause = {};
-    
+
     if (status) whereClause.status = status;
     if (priority) whereClause.priority = priority;
     if (team) whereClause.teamId = team;
@@ -270,15 +678,12 @@ router.get('/', authenticateToken, validatePagination, async (req, res) => {
       ];
     }
 
-    // Role-based filtering
+    // Role-based filtering - Show only tickets created by current user
     if (userPermissions.role === 'user') {
-      // Regular users can only see tickets they created or are assigned to
-      whereClause[Op.or] = [
-        { createdBy: req.user.id },
-        { assignedTo: req.user.id }
-      ];
+      // Regular users can only see tickets they created
+      whereClause.createdBy = req.user.id;
     } else if (userPermissions.role === 'team') {
-      // Team managers can see all tickets related to their team
+      // Team managers can see tickets created by their team members
       const user = await User.findOne({ where: { email: req.user.email } });
       if (user && user.teamId) {
         whereClause.teamId = user.teamId;
@@ -321,7 +726,12 @@ router.get('/', authenticateToken, validatePagination, async (req, res) => {
         },
         {
           model: Team,
-          as: 'team',
+          as: 'creatorTeam',
+          attributes: ['id', 'teamName']
+        },
+        {
+          model: Team,
+          as: 'assignedTeam',
           attributes: ['id', 'teamName']
         },
         {
@@ -358,10 +768,10 @@ router.get('/stats', authenticateToken, async (req, res) => {
   try {
     // Check user permissions
     const userPermissions = await checkUserPermissions(req.user);
-    
+
     // Build where clause based on user role
     const whereClause = {};
-    
+
     if (userPermissions.role === 'user') {
       whereClause[Op.or] = [
         { createdBy: req.user.id },
@@ -398,9 +808,9 @@ router.get('/stats', authenticateToken, async (req, res) => {
       highPriorityTickets: highPriorityTickets,
       mediumPriorityTickets: mediumPriorityTickets,
       lowPriorityTickets: lowPriorityTickets,
-      myTickets: userPermissions.role === 'user' ? 
-        await Ticket.count({ 
-          where: { 
+      myTickets: userPermissions.role === 'user' ?
+        await Ticket.count({
+          where: {
             [Op.or]: [
               { createdBy: req.user.id },
               { assignedTo: req.user.id }
@@ -439,7 +849,12 @@ router.get('/:id', authenticateToken, validateId, async (req, res) => {
         },
         {
           model: Team,
-          as: 'team',
+          as: 'creatorTeam',
+          attributes: ['id', 'teamName']
+        },
+        {
+          model: Team,
+          as: 'assignedTeam',
           attributes: ['id', 'teamName']
         },
         {
@@ -458,12 +873,12 @@ router.get('/:id', authenticateToken, validateId, async (req, res) => {
 
     // Check access permissions
     const userPermissions = await checkUserPermissions(req.user);
-    
+
     if (userPermissions.role === 'user') {
-      const canAccess = ticket.createdBy === req.user.id || 
-                       ticket.assignedTo === req.user.id || 
-                       ticket.teamId === req.user.teamId;
-      
+      const canAccess = ticket.createdBy === req.user.id ||
+        ticket.assignedTo === req.user.id ||
+        ticket.teamId === req.user.teamId;
+
       if (!canAccess) {
         return res.status(403).json({
           error: 'Access denied'
@@ -488,23 +903,119 @@ router.get('/:id', authenticateToken, validateId, async (req, res) => {
   }
 });
 
-// Approve or reject ticket
-router.put('/:id/approve', authenticateToken, validateId, async (req, res) => {
+// Update ticket status
+router.patch('/:id/status', authenticateToken, validateId, async (req, res) => {
   try {
+    const { status } = req.body;
+
+    if (!status) {
+      return res.status(400).json({
+        error: 'Status is required'
+      });
+    }
+
     const ticket = await Ticket.findByPk(req.params.id);
-    
+
     if (!ticket) {
       return res.status(404).json({
         error: 'Ticket not found'
       });
     }
 
-    // Check permissions - only admin or super_admin can approve/reject tickets
-    const userPermissions = await checkUserPermissions(req.user);
-    
-    if (userPermissions.role !== 'admin' && userPermissions.role !== 'super_admin') {
+    // Check permissions - assigned user can update status
+    if (ticket.assignedTo !== req.user.id) {
       return res.status(403).json({
-        error: 'Access denied. Only administrators can approve or reject tickets.'
+        error: 'Access denied. Only assigned user can update ticket status.'
+      });
+    }
+
+    // Validate status transition
+    const validTransitions = {
+      'APPROVED': ['IN_PROGRESS'],
+      'IN_PROGRESS': ['COMPLETED', 'ON_HOLD'],
+      'ON_HOLD': ['IN_PROGRESS']
+    };
+
+    if (validTransitions[ticket.status] && !validTransitions[ticket.status].includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status transition from ${ticket.status} to ${status}`
+      });
+    }
+
+    await ticket.update({ status });
+
+    // Use the notification service to create notifications
+    const NotificationService = require('../services/notificationService');
+
+    // Determine notification type based on status
+    let notificationType = 'TICKET_CREATED'; // Default
+    if (status === 'IN_PROGRESS') {
+      notificationType = 'TICKET_ASSIGNED';
+    } else if (status === 'COMPLETED') {
+      notificationType = 'TICKET_COMPLETED';
+    }
+
+    await NotificationService.createTicketNotification({
+      ticketId: ticket.id,
+      ticketTitle: ticket.title,
+      type: notificationType,
+      message: `Ticket "${ticket.title}" status has been updated to ${status}`,
+      // Notify the creator of the ticket
+      sendToCreator: true,
+      creatorId: ticket.createdBy,
+      // Notify the team manager
+      sendToTeamManager: true,
+      teamId: ticket.teamId,
+      // If completed, notify admins for visibility
+      sendToAdmins: status === 'COMPLETED',
+      priority: ticket.priority.toLowerCase() || 'medium'
+    });
+
+    res.json({
+      message: 'Ticket status updated successfully',
+      ticket
+    });
+  } catch (error) {
+    console.error('Update ticket status error:', error);
+    res.status(500).json({
+      error: 'Failed to update ticket status',
+      message: error.message
+    });
+  }
+});
+
+// Approve or reject ticket
+router.put('/:id/approve', authenticateToken, validateId, async (req, res) => {
+  try {
+    console.log('Approve endpoint called with params:', req.params);
+    console.log('Approve endpoint called with body:', req.body);
+
+    const ticket = await Ticket.findByPk(req.params.id);
+
+    if (!ticket) {
+      return res.status(404).json({
+        error: 'Ticket not found'
+      });
+    }
+
+    // Check permissions - admin, super_admin, team manager, or assigned user can approve/reject tickets
+    const userPermissions = await checkUserPermissions(req.user);
+
+    let canApproveReject = userPermissions.role === 'admin' ||
+      userPermissions.role === 'super_admin' ||
+      ticket.assignedTo === req.user.id;
+
+    // Also allow team managers to approve/reject tickets assigned to their team
+    if (userPermissions.role === 'team') {
+      const team = await Team.findOne({ where: { email: req.user.email } });
+      if (team && ticket.assignedTeamId === team.id) {
+        canApproveReject = true;
+      }
+    }
+
+    if (!canApproveReject) {
+      return res.status(403).json({
+        error: 'Access denied. Only administrators, team managers, or assigned users can approve or reject tickets.'
       });
     }
 
@@ -533,53 +1044,43 @@ router.put('/:id/approve', authenticateToken, validateId, async (req, res) => {
     }
 
     await ticket.update(updateData);
+    console.log('Ticket updated with data:', updateData);
 
-    const updatedTicket = await Ticket.findByPk(req.params.id, {
-      include: [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['id', 'name', 'email']
-        },
-        {
-          model: User,
-          as: 'assignedUser',
-          attributes: ['id', 'name', 'email']
-        },
-        {
-          model: User,
-          as: 'approver',
-          attributes: ['id', 'name', 'email']
-        },
-        {
-          model: Team,
-          as: 'team',
-          attributes: ['id', 'teamName']
-        },
-        {
-          model: Project,
-          as: 'projectRef',
-          attributes: ['id', 'name', 'code']
-        }
-      ]
-    });
+    // Skip trying to load associations that are causing errors
+    // Just get the basic ticket data without associations
 
-    // Create notification for ticket creator
-    await Notification.create({
-      userId: ticket.createdBy,
-      title: approved ? 'Ticket Approved' : 'Ticket Rejected',
-      message: approved 
-        ? `Your ticket "${ticket.title}" has been approved.` 
+    // Use the notification service to create notifications
+    const NotificationService = require('../services/notificationService');
+
+    await NotificationService.createTicketNotification({
+      ticketId: ticket.id,
+      ticketTitle: ticket.title,
+      type: approved ? 'TICKET_APPROVED' : 'TICKET_REJECTED',
+      message: approved
+        ? `Your ticket "${ticket.title}" has been approved.`
         : `Your ticket "${ticket.title}" has been rejected. Reason: ${rejectionReason || 'No reason provided'}`,
-      type: approved ? 'ticket_approved' : 'ticket_rejected',
-      priority: 'medium',
-      isRead: false,
-      ticketId: ticket.id
+      // Always notify the creator of the ticket
+      sendToCreator: true,
+      creatorId: ticket.createdBy,
+      // Notify the team that created the ticket
+      sendToTeamManager: true,
+      teamId: ticket.teamId,
+      // If assigned to a different team, notify that team's manager when approved
+      sendToAssignedTeamManager: approved && ticket.assignedTeamId && ticket.assignedTeamId !== ticket.teamId,
+      assignedTeamId: ticket.assignedTeamId,
+      // If the ticket is approved, also notify admins for visibility
+      sendToAdmins: approved,
+      // If the ticket is rejected, include the rejection reason in the notification
+      metadata: !approved && rejectionReason ? { rejectionReason } : undefined,
+      priority: ticket.priority.toLowerCase() || 'medium'
     });
+
+    // Make sure we have a valid ticket object to return
+    const ticketToReturn = await Ticket.findByPk(req.params.id);
 
     res.json({
       message: approved ? 'Ticket approved successfully' : 'Ticket rejected successfully',
-      ticket: updatedTicket
+      ticket: ticketToReturn
     });
   } catch (error) {
     console.error('Approve/reject ticket error:', error);
@@ -594,7 +1095,7 @@ router.put('/:id/approve', authenticateToken, validateId, async (req, res) => {
 router.put('/:id', authenticateToken, validateId, validateTicketUpdate, async (req, res) => {
   try {
     const ticket = await Ticket.findByPk(req.params.id);
-    
+
     if (!ticket) {
       return res.status(404).json({
         error: 'Ticket not found'
@@ -603,11 +1104,11 @@ router.put('/:id', authenticateToken, validateId, validateTicketUpdate, async (r
 
     // Check permissions
     const userPermissions = await checkUserPermissions(req.user);
-    
+
     if (userPermissions.role === 'user') {
-      const canUpdate = ticket.createdBy === req.user.id || 
-                       ticket.assignedTo === req.user.id;
-      
+      const canUpdate = ticket.createdBy === req.user.id ||
+        ticket.assignedTo === req.user.id;
+
       if (!canUpdate) {
         return res.status(403).json({
           error: 'Access denied'
@@ -623,20 +1124,20 @@ router.put('/:id', authenticateToken, validateId, validateTicketUpdate, async (r
     }
 
     const updateData = { ...req.body };
-    
+
     // Handle status changes
     if (updateData.status && updateData.status !== ticket.status) {
       if (updateData.status === 'APPROVED' || updateData.status === 'REJECTED') {
         updateData.approvedBy = req.user.id;
         updateData.approvedAt = new Date();
       }
-      
+
       if (updateData.status === 'COMPLETED') {
         updateData.actualClosure = new Date();
       }
     }
 
-    // Only Admin or SuperAdmin can approve/reject and set priority/expectedClosure if ticket is PENDING_APPROVAL
+    // Only Admin, SuperAdmin, or assigned user can approve/reject and set priority/expectedClosure if ticket is PENDING_APPROVAL
     if (
       (updateData.status === 'APPROVED' || updateData.status === 'REJECTED' || updateData.priority || updateData.expectedClosure)
     ) {
@@ -645,9 +1146,23 @@ router.put('/:id', authenticateToken, validateId, validateTicketUpdate, async (r
           error: 'Ticket has already been approved or rejected. No further changes allowed.'
         });
       }
-      if (userPermissions.role !== 'admin' && userPermissions.role !== 'super_admin') {
+
+      // Check if user has permission to approve/reject
+      let canApproveReject = userPermissions.role === 'admin' ||
+        userPermissions.role === 'super_admin' ||
+        ticket.assignedTo === req.user.id;
+
+      // Also allow team managers to approve/reject tickets assigned to their team
+      if (userPermissions.role === 'team') {
+        const team = await Team.findOne({ where: { email: req.user.email } });
+        if (team && ticket.assignedTeamId === team.id) {
+          canApproveReject = true;
+        }
+      }
+
+      if (!canApproveReject) {
         return res.status(403).json({
-          error: 'Only Admin or SuperAdmin can approve/reject and set priority or expected closure.'
+          error: 'Only Admin, SuperAdmin, team managers, or assigned users can approve/reject and set priority or expected closure.'
         });
       }
     }
@@ -701,7 +1216,7 @@ router.put('/:id', authenticateToken, validateId, validateTicketUpdate, async (r
 router.post('/:id/comments', authenticateToken, validateId, async (req, res) => {
   try {
     const { content, isInternal } = req.body;
-    
+
     const ticket = await Ticket.findByPk(req.params.id);
     if (!ticket) {
       return res.status(404).json({
@@ -711,12 +1226,12 @@ router.post('/:id/comments', authenticateToken, validateId, async (req, res) => 
 
     // Check permissions
     const userPermissions = await checkUserPermissions(req.user);
-    
+
     if (userPermissions.role === 'user') {
-      const canComment = ticket.createdBy === req.user.id || 
-                        ticket.assignedTo === req.user.id || 
-                        ticket.teamId === req.user.teamId;
-      
+      const canComment = ticket.createdBy === req.user.id ||
+        ticket.assignedTo === req.user.id ||
+        ticket.teamId === req.user.teamId;
+
       if (!canComment) {
         return res.status(403).json({
           error: 'Access denied'
@@ -751,7 +1266,7 @@ router.post('/:id/comments', authenticateToken, validateId, async (req, res) => 
 router.post('/:id/resources', authenticateToken, validateId, async (req, res) => {
   try {
     const { resourceId, quantity, reason } = req.body;
-    
+
     const ticket = await Ticket.findByPk(req.params.id);
     if (!ticket) {
       return res.status(404).json({
@@ -761,11 +1276,11 @@ router.post('/:id/resources', authenticateToken, validateId, async (req, res) =>
 
     // Check permissions
     const userPermissions = await checkUserPermissions(req.user);
-    
+
     if (userPermissions.role === 'user') {
-      const canRequest = ticket.createdBy === req.user.id || 
-                        ticket.assignedTo === req.user.id;
-      
+      const canRequest = ticket.createdBy === req.user.id ||
+        ticket.assignedTo === req.user.id;
+
       if (!canRequest) {
         return res.status(403).json({
           error: 'Access denied'
@@ -802,7 +1317,7 @@ router.post('/:id/resources', authenticateToken, validateId, async (req, res) =>
 router.put('/:id/resources/:index', authenticateToken, validateId, isManagerOrAdmin, async (req, res) => {
   try {
     const { action, reason } = req.body; // action: 'approve' or 'deny'
-    
+
     const ticket = await Ticket.findByPk(req.params.id);
     if (!ticket) {
       return res.status(404).json({
@@ -823,7 +1338,7 @@ router.put('/:id/resources/:index', authenticateToken, validateId, isManagerOrAd
     request.status = action;
     request.processedBy = req.user.id;
     request.processedAt = new Date();
-    
+
     if (action === 'deny') {
       request.reason = reason;
     }
@@ -847,9 +1362,9 @@ router.put('/:id/resources/:index', authenticateToken, validateId, isManagerOrAd
 router.get('/stats/overview', authenticateToken, isManagerOrAdmin, async (req, res) => {
   try {
     const userPermissions = await checkUserPermissions(req.user);
-    
+
     let whereClause = {};
-    
+
     // Role-based filtering
     if (userPermissions.role === 'admin') {
       const managedTeam = await Team.findOne({ where: { adminId: userPermissions.adminId } });
@@ -859,16 +1374,16 @@ router.get('/stats/overview', authenticateToken, isManagerOrAdmin, async (req, r
     }
 
     const totalTickets = await Ticket.count({ where: whereClause });
-    const pendingTickets = await Ticket.count({ 
+    const pendingTickets = await Ticket.count({
       where: { ...whereClause, status: 'PENDING_APPROVAL' }
     });
-    const inProgressTickets = await Ticket.count({ 
+    const inProgressTickets = await Ticket.count({
       where: { ...whereClause, status: 'IN_PROGRESS' }
     });
-    const completedTickets = await Ticket.count({ 
+    const completedTickets = await Ticket.count({
       where: { ...whereClause, status: 'COMPLETED' }
     });
-    const rejectedTickets = await Ticket.count({ 
+    const rejectedTickets = await Ticket.count({
       where: { ...whereClause, status: 'REJECTED' }
     });
 
@@ -908,7 +1423,7 @@ router.get('/stats/overview', authenticateToken, isManagerOrAdmin, async (req, r
 router.delete('/:id', authenticateToken, validateId, isAdmin, async (req, res) => {
   try {
     const ticket = await Ticket.findByPk(req.params.id);
-    
+
     if (!ticket) {
       return res.status(404).json({
         error: 'Ticket not found'

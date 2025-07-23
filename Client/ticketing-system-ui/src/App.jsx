@@ -18,6 +18,7 @@ import CreateAdmin from './pages/CreateAdmin';
 import CreateTeam from './pages/CreateTeam';
 import CreateMember from './pages/CreateMember';
 import TicketApproval from './pages/TicketApproval';
+import AssignedTickets from './pages/AssignedTickets';
 import Layout from './components/Layout';
 
 // Protected Route Component
@@ -65,6 +66,7 @@ function App() {
               
               {/* Ticket Routes - All users can access */}
               <Route path="tickets" element={<Tickets />} />
+              <Route path="tickets/assigned" element={<AssignedTickets />} />
               <Route 
                 path="tickets/create" 
                 element={
@@ -83,11 +85,11 @@ function App() {
                 } 
               />
               
-              {/* Ticket Approval - Only Admin and Super Admin */}
+              {/* Ticket Approval - Only Team Managers, Admin and Super Admin */}
               <Route
                 path="tickets/approval"
                 element={
-                  <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+                  <ProtectedRoute allowedRoles={['team', 'admin', 'super_admin']}>
                     <TicketApproval />
                   </ProtectedRoute>
                 }

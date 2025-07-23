@@ -212,6 +212,36 @@ router.get('/all', authenticateToken, isManagerOrAdmin, async (req, res) => {
   }
 });
 
+// Get team members by team ID (for ticket assignment)
+router.get('/team/:teamId', authenticateToken, async (req, res) => {
+  try {
+    const { teamId } = req.params;
+    
+    if (!teamId) {
+      return res.status(400).json({
+        error: 'Team ID is required'
+      });
+    }
+
+    const users = await User.findAll({
+      where: { 
+        teamId: teamId,
+        isActive: true 
+      },
+      attributes: ['id', 'username', 'name', 'email'],
+      order: [['name', 'ASC']]
+    });
+
+    res.json({ users });
+  } catch (error) {
+    console.error('Get team members error:', error);
+    res.status(500).json({
+      error: 'Failed to get team members',
+      message: error.message
+    });
+  }
+});
+
 // Get users for ticket creation (all authenticated users)
 router.get('/for-tickets', authenticateToken, async (req, res) => {
   try {

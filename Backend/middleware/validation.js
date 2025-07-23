@@ -175,9 +175,9 @@ const validateTicketCreation = [
     .optional({ nullable: true })
     .isInt()
     .withMessage('Please provide a valid assigned user ID'),
-  body('department')
-    .isIn(['IT', 'HR', 'Finance', 'Marketing', 'Sales', 'Operations', 'Engineering', 'Design'])
-    .withMessage('Please select a valid department'),
+  body('assignedTeamId')
+    .isInt()
+    .withMessage('Please provide a valid assigned team ID'),
   body('dueDate')
     .isISO8601()
     .withMessage('Please provide a valid due date'),

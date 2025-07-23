@@ -23,9 +23,14 @@ const Ticket = sequelize.define('Ticket', {
     type: DataTypes.ENUM('technical', 'business', 'infrastructure', 'security', 'performance', 'ui/ux', 'database', 'api'),
     allowNull: false
   },
-  department: {
-    type: DataTypes.ENUM('IT', 'HR', 'Finance', 'Marketing', 'Sales', 'Operations', 'Engineering', 'Design'),
-    allowNull: false
+  assignedTeamId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'teams',
+      key: 'id'
+    },
+    comment: 'Team to which the task is assigned (can be different from creator team)'
   },
   dueDate: {
     type: DataTypes.DATE,

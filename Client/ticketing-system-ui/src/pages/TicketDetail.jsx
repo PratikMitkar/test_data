@@ -30,8 +30,10 @@ const TicketDetail = () => {
     rejectionReason: ''
   });
 
-  // Check if user is admin or super_admin
+  // Check if user is admin or super_admin or assigned to this ticket
   const isAdminOrSuperAdmin = ['admin', 'super_admin'].includes(user?.role);
+  const isAssignedUser = ticket?.assignedTo === user?.id;
+  const hasAdminPrivileges = isAdminOrSuperAdmin || isAssignedUser;
 
   useEffect(() => {
     fetchTicket();
@@ -172,13 +174,18 @@ const TicketDetail = () => {
         <span className="text-[#141414] text-base font-medium leading-normal">Ticket #{ticket.id}</span>
       </div>
 
-      {/* Ticket Title */}
+      {/* Ticket Title and Actions */}
       <div className="flex flex-wrap justify-between gap-3 p-4">
         <div className="flex min-w-72 flex-col gap-3">
           <p className="text-[#141414] tracking-light text-[32px] font-bold leading-tight">{ticket.title}</p>
           <p className="text-neutral-500 text-sm font-normal leading-normal">
             {projectName} | Ticket #{ticket.id}
           </p>
+        </div>
+        
+        {/* Action Buttons - Keeping only essential top-level actions */}
+        <div className="flex items-center gap-3">
+          {/* Only show basic view/navigation actions at the top */}
         </div>
       </div>
 
@@ -225,12 +232,7 @@ const TicketDetail = () => {
               </div>
             )}
 
-            {ticket.department && (
-              <div className="col-span-2 grid grid-cols-subgrid border-t border-t-[#dbdbdb] py-5">
-                <p className="text-neutral-500 text-sm font-normal leading-normal">Department</p>
-                <p className="text-[#141414] text-sm font-normal leading-normal">{ticket.department}</p>
-              </div>
-            )}
+
 
             <div className="col-span-2 grid grid-cols-subgrid border-t border-t-[#dbdbdb] py-5">
               <p className="text-neutral-500 text-sm font-normal leading-normal">Created On</p>
@@ -251,10 +253,17 @@ const TicketDetail = () => {
               </div>
             )}
 
-            {ticket.team && (
+            {ticket.creatorTeam && (
               <div className="col-span-2 grid grid-cols-subgrid border-t border-t-[#dbdbdb] py-5">
-                <p className="text-neutral-500 text-sm font-normal leading-normal">Team</p>
-                <p className="text-[#141414] text-sm font-normal leading-normal">{ticket.team.teamName}</p>
+                <p className="text-neutral-500 text-sm font-normal leading-normal">Created by Team</p>
+                <p className="text-[#141414] text-sm font-normal leading-normal">{ticket.creatorTeam.teamName}</p>
+              </div>
+            )}
+            
+            {ticket.assignedTeam && (
+              <div className="col-span-2 grid grid-cols-subgrid border-t border-t-[#dbdbdb] py-5">
+                <p className="text-neutral-500 text-sm font-normal leading-normal">Assigned to Team</p>
+                <p className="text-[#141414] text-sm font-normal leading-normal">{ticket.assignedTeam.teamName}</p>
               </div>
             )}
             
@@ -351,8 +360,8 @@ const TicketDetail = () => {
             
             {/* Actions - Moved below activity log */}
             <div className="col-span-2 border-t border-t-[#dbdbdb] mt-4 pt-4">
-              {/* Admin/Super Admin Actions for Pending Approval tickets */}
-              {isAdminOrSuperAdmin && ticket.status === 'PENDING_APPROVAL' && (
+              {/* Admin/Super Admin/Assigned User Actions for Pending Approval tickets */}
+              {hasAdminPrivileges && ticket.status === 'PENDING_APPROVAL' && (
                 <div className="flex gap-2">
                   <button
                     onClick={() => openApprovalModal('approve')}
@@ -373,8 +382,8 @@ const TicketDetail = () => {
                 </div>
               )}
 
-              {/* Regular user actions for In Progress tickets */}
-              {!isAdminOrSuperAdmin && ticket.status === 'IN_PROGRESS' && (
+              {/* Assigned user actions for In Progress tickets */}
+              {isAssignedUser && ticket.status === 'IN_PROGRESS' && (
                 <button
                   onClick={() => handleStatusUpdate('COMPLETED')}
                   disabled={submitting}
@@ -385,8 +394,8 @@ const TicketDetail = () => {
                 </button>
               )}
 
-              {/* Edit button for pending approval tickets */}
-              {ticket.status === 'PENDING_APPROVAL' && (
+              {/* Edit button for pending approval tickets - show for creator, admin, or assigned user */}
+              {(ticket.createdBy === user?.id || hasAdminPrivileges) && ticket.status === 'PENDING_APPROVAL' && (
                 <button
                   onClick={() => navigate(`/tickets/${id}/edit`)}
                   className="flex items-center justify-center rounded-xl h-10 px-4 border border-[#dbdbdb] bg-white text-[#141414] text-sm font-medium w-full mt-2"

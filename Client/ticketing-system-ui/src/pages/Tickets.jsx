@@ -158,8 +158,8 @@ const Tickets = () => {
       {/* Header with Project Title */}
       <div className="flex flex-wrap justify-between gap-3 p-4">
         <div className="flex min-w-72 flex-col gap-3">
-          <p className="text-[#141414] tracking-light text-[32px] font-bold leading-tight">Project Alpha</p>
-          <p className="text-neutral-500 text-sm font-normal leading-normal">Manage all tickets related to Project Alpha</p>
+          <p className="text-[#141414] tracking-light text-[32px] font-bold leading-tight">My Created Tickets</p>
+          <p className="text-neutral-500 text-sm font-normal leading-normal">Tickets you have created and submitted</p>
         </div>
       </div>
 
@@ -195,7 +195,7 @@ const Tickets = () => {
             <div className="text-center py-12 w-full">
               <h3 className="mt-2 text-sm font-medium text-[#141414]">No tickets found</h3>
               <p className="mt-1 text-sm text-neutral-500">
-                {filters.search || filters.status || filters.priority ? 'Try adjusting your filters.' : 'Get started by creating a new ticket.'}
+                {filters.search || filters.status || filters.priority ? 'Try adjusting your filters.' : 'You haven\'t created any tickets yet. Get started by creating a new ticket.'}
               </p>
             </div>
           ) : (
@@ -205,7 +205,7 @@ const Tickets = () => {
                   <th className="table-column-120 px-6 py-4 text-left text-[#141414] w-[35%] text-sm font-medium leading-normal">Title</th>
                   <th className="table-column-240 px-6 py-4 text-center text-[#141414] w-[20%] text-sm font-medium leading-normal">Priority</th>
                   <th className="table-column-360 px-6 py-4 text-center text-[#141414] w-[20%] text-sm font-medium leading-normal">Status</th>
-                  <th className="table-column-480 px-6 py-4 text-left text-[#141414] w-[20%] text-sm font-medium leading-normal">Assignee</th>
+                  <th className="table-column-480 px-6 py-4 text-left text-[#141414] w-[20%] text-sm font-medium leading-normal">Assigned Team</th>
                   <th className="table-column-600 px-6 py-4 text-center text-[#141414] w-[5%] text-sm font-medium leading-normal">Actions</th>
                 </tr>
               </thead>
@@ -234,7 +234,12 @@ const Tickets = () => {
                       </div>
                     </td>
                     <td className="table-column-480 h-[72px] px-6 py-4 w-[20%] text-neutral-500 text-sm font-normal leading-normal">
-                      {ticket.createdBy?.name || 'Unassigned'}
+                      {ticket.assignedTeam?.teamName || 'Unassigned'}
+                      {ticket.assignedTo && (
+                        <div className="text-xs text-neutral-400">
+                          → {ticket.assignedUser?.name || 'Unknown User'}
+                        </div>
+                      )}
                     </td>
                     <td className="table-column-600 h-[72px] px-6 py-4 w-[5%] text-sm font-medium text-center">
                       <div className="flex items-center justify-center">

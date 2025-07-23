@@ -16,7 +16,8 @@ import {
   BarChart as PresentationChart,
   Plus,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  ArrowRight
 } from 'lucide-react';
 
 const Layout = () => {
@@ -41,9 +42,10 @@ const Layout = () => {
 
   const navigation = [
     { name: 'Home', href: '/dashboard', icon: House },
-    { name: 'Inbox', href: '/tickets', icon: Tray, exact: true },
+    { name: 'My Tickets', href: '/tickets', icon: Tray, exact: true },
+    { name: 'Assigned to Me', href: '/tickets/assigned', icon: ArrowRight },
     { name: 'Projects', href: '/projects', icon: FolderOpen, roles: ['team', 'admin', 'super_admin'] },
-    { name: 'Reports', href: '/tickets/approval', icon: PresentationChart, roles: ['admin', 'super_admin'] },
+    { name: 'Approval Tasks', href: '/tickets/approval', icon: PresentationChart, roles: ['team', 'admin', 'super_admin'] },
     { name: 'People', href: '/users', icon: Users, roles: ['admin', 'super_admin'] },
     { name: 'Teams', href: '/teams', icon: Building, roles: ['admin', 'super_admin'] },
     { name: 'Notifications', href: '/notifications', icon: Bell },
@@ -75,8 +77,10 @@ const Layout = () => {
     // But make sure it's not a sub-path of another item
     // For example, /tickets/123 should match Inbox, but /tickets/approval should not
     if (item.href === '/tickets' && currentPath.startsWith('/tickets/')) {
-      // Don't match /tickets/approval for the Inbox item
-      return !currentPath.startsWith('/tickets/approval') && !currentPath.match(/\/tickets\/\d+\/edit$/);
+      // Don't match /tickets/approval or /tickets/assigned for the Inbox item
+      return !currentPath.startsWith('/tickets/approval') && 
+             !currentPath.startsWith('/tickets/assigned') && 
+             !currentPath.match(/\/tickets\/\d+\/edit$/);
     }
     
     return currentPath === item.href || currentPath.startsWith(`${item.href}/`);

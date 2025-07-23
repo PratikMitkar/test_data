@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Calendar, 
-  User, 
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Calendar,
+  User,
   AlertTriangle,
   MessageSquare,
   Filter,
@@ -32,31 +32,54 @@ const TicketApproval = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('PENDING_APPROVAL');
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [selectedTicketForAssign, setSelectedTicketForAssign] = useState(null);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [assignmentData, setAssignmentData] = useState({
+    assignedTo: ''
+  });
 
-  // Only admin and super admin can access this page
-  if (!['admin', 'super_admin'].includes(user?.role)) {
-    return (
-      <div className="text-center py-12">
-        <AlertTriangle className="mx-auto h-12 w-12 text-red-400" />
-        <h3 className="mt-2 text-sm font-medium text-[#141414]">Access Denied</h3>
-        <p className="mt-1 text-sm text-neutral-500">
-          You don't have permission to access this page.
-        </p>
-      </div>
-    );
-  }
+  // Check if user has access - admin, super_admin, or team manager
+  const isAdminOrSuperAdmin = ['admin', 'super_admin'].includes(user?.role);
+  const isTeamManager = user?.role === 'team';
+  const hasAccess = isAdminOrSuperAdmin || isTeamManager;
+  const [hasApprovalTasks, setHasApprovalTasks] = useState(false);
 
   useEffect(() => {
     fetchTickets();
-  }, [filterStatus]);
+  }, [filterStatus, isAdminOrSuperAdmin]);
+
+  // Add debounced search effect
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchTickets();
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   const fetchTickets = async () => {
     try {
-      const response = await axios.get(getApiUrl(`/api/tickets?status=${filterStatus}&limit=50`));
-      setTickets(response.data.tickets || []);
+      // Use the new approval-tasks endpoint that handles both admin and regular users
+      const params = new URLSearchParams();
+      params.append('status', filterStatus);
+      params.append('limit', '50');
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+
+      const url = `/api/tickets/approval-tasks?${params}`;
+      const response = await axios.get(getApiUrl(url));
+      const fetchedTickets = response.data.tickets || [];
+      setTickets(fetchedTickets);
+
+      // Check if user has any approval tasks for access control
+      if (!isAdminOrSuperAdmin && !isTeamManager) {
+        setHasApprovalTasks(fetchedTickets.length > 0);
+      }
     } catch (error) {
-      console.error('Failed to fetch tickets:', error);
-      toast.error('Failed to load tickets');
+      console.error('Failed to fetch approval tasks:', error);
+      toast.error('Failed to load approval tasks');
     } finally {
       setLoading(false);
     }
@@ -66,29 +89,28 @@ const TicketApproval = () => {
     if (!selectedTicket) return;
 
     try {
+      // Make sure we're sending the correct data format expected by the backend
       const updateData = {
-        status: approvalData.action === 'approve' ? 'APPROVED' : 'REJECTED'
+        approved: approvalData.action === 'approve',
+        priority: approvalData.priority || 'MEDIUM'
       };
 
       if (approvalData.action === 'approve') {
-        updateData.priority = approvalData.priority;
         if (approvalData.expectedClosure) {
           updateData.expectedClosure = approvalData.expectedClosure;
         }
       } else {
-        updateData.rejectionReason = approvalData.rejectionReason;
+        updateData.rejectionReason = approvalData.rejectionReason || 'No reason provided';
       }
 
-      await axios.put(getApiUrl(`/api/tickets/${selectedTicket.id}`), updateData);
+      console.log('Sending approval data:', updateData);
+
+      await axios.put(getApiUrl(`/api/tickets/${selectedTicket.id}/approve`), updateData);
 
       toast.success(`Ticket ${approvalData.action === 'approve' ? 'approved' : 'rejected'} successfully!`);
-      
-      // Update the ticket in the list
-      setTickets(tickets.map(ticket => 
-        ticket.id === selectedTicket.id 
-          ? { ...ticket, ...updateData }
-          : ticket
-      ));
+
+      // Refresh the tickets list from server to get updated data
+      await fetchTickets();
 
       setShowApprovalModal(false);
       setSelectedTicket(null);
@@ -115,12 +137,60 @@ const TicketApproval = () => {
     setShowApprovalModal(true);
   };
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.creator?.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
-  });
+  const openAssignModal = async (ticket) => {
+    setSelectedTicketForAssign(ticket);
+    setAssignmentData({ assignedTo: '' });
+
+    // Fetch team members for assignment
+    try {
+      const response = await axios.get(getApiUrl('/api/teams/members'));
+      console.log('Team members response:', response.data.members);
+      setTeamMembers(response.data.members || []);
+    } catch (error) {
+      console.error('Failed to fetch team members:', error);
+      toast.error('Failed to load team members');
+    }
+
+    setShowAssignModal(true);
+  };
+
+  const handleAssignToMember = async () => {
+    if (!selectedTicketForAssign || !assignmentData.assignedTo) return;
+
+    try {
+      await axios.put(getApiUrl(`/api/tickets/${selectedTicketForAssign.id}/assign-member`), {
+        assignedTo: assignmentData.assignedTo
+      });
+
+      toast.success('Ticket assigned to team member successfully!');
+
+      // Refresh the tickets list from server to get updated data
+      await fetchTickets();
+
+      setShowAssignModal(false);
+      setSelectedTicketForAssign(null);
+      setAssignmentData({ assignedTo: '' });
+    } catch (error) {
+      console.error('Failed to assign ticket:', error);
+      toast.error('Failed to assign ticket to team member');
+    }
+  };
+
+  // Since search is now handled by the backend API, we can use tickets directly
+  const filteredTickets = tickets;
+
+  // Show access denied if user doesn't have access (not admin, super_admin, or team manager)
+  if (!hasAccess) {
+    return (
+      <div className="text-center py-12">
+        <AlertTriangle className="mx-auto h-12 w-12 text-red-400" />
+        <h3 className="mt-2 text-sm font-medium text-[#141414]">Access Denied</h3>
+        <p className="mt-1 text-sm text-neutral-500">
+          Only administrators and team managers can access the approval page.
+        </p>
+      </div>
+    );
+  }
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -161,7 +231,7 @@ const TicketApproval = () => {
       'TASK': { icon: Ticket, color: 'text-[#166534]' },
       'default': { icon: Ticket, color: 'text-[#6B7280]' }
     };
-    
+
     const config = iconConfig[type] || iconConfig.default;
     const Icon = config.icon;
     return <Icon className={`h-6 w-6 ${config.color}`} />;
@@ -178,9 +248,16 @@ const TicketApproval = () => {
   return (
     <div className="flex flex-col flex-1">
       <div className="flex flex-wrap justify-between gap-3 p-4">
-        <p className="text-[#141414] tracking-light text-[32px] font-bold leading-tight min-w-72">Ticket Approval</p>
+        <p className="text-[#141414] tracking-light text-[32px] font-bold leading-tight min-w-72">
+          {isAdminOrSuperAdmin ? 'Ticket Approval' : isTeamManager ? 'Team Approval Tasks' : 'Approval Tasks'}
+        </p>
         <p className="text-neutral-500 text-sm font-normal leading-normal">
-          Review and approve or reject submitted tickets
+          {isAdminOrSuperAdmin
+            ? 'Review and approve or reject submitted tickets system-wide'
+            : isTeamManager
+              ? 'Review and approve or reject tickets from your team members'
+              : 'Review and approve or reject tickets'
+          }
         </p>
       </div>
 
@@ -212,7 +289,9 @@ const TicketApproval = () => {
                 className="w-full pl-10 pr-4 py-2 border border-[#dbdbdb] rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent appearance-none"
               >
                 <option value="PENDING_APPROVAL">Pending Approval</option>
-                <option value="APPROVED">Approved</option>
+                <option value="APPROVED">Awaiting Assignment</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
                 <option value="REJECTED">Rejected</option>
                 <option value="">All Tickets</option>
               </select>
@@ -244,7 +323,12 @@ const TicketApproval = () => {
                       <div>
                         <div className="flex items-center gap-3">
                           <h3 className="text-lg font-medium text-[#141414]">
-                            {ticket.title}
+                            <a
+                              href={`/tickets/${ticket.id}`}
+                              className="hover:underline cursor-pointer"
+                            >
+                              {ticket.title}
+                            </a>
                           </h3>
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(ticket.status)}`}>
                             {ticket.status.replace('_', ' ')}
@@ -255,18 +339,35 @@ const TicketApproval = () => {
                             </span>
                           )}
                         </div>
-                        
+
                         <p className="mt-2 text-sm text-neutral-500 line-clamp-2">
                           {ticket.description}
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="mt-3 flex items-center gap-6 text-sm text-neutral-500 ml-16">
                       <div className="flex items-center">
                         <User className="h-4 w-4 mr-1" />
                         <span>Created by: {ticket.creator?.name || 'Unknown'}</span>
                       </div>
+                      {ticket.creatorTeam && (
+                        <div className="flex items-center">
+                          <Flag className="h-4 w-4 mr-1" />
+                          <span>From: {ticket.creatorTeam.teamName}</span>
+                        </div>
+                      )}
+                      {ticket.assignedTeam && (
+                        <div className="flex items-center">
+                          <Flag className="h-4 w-4 mr-1" />
+                          <span>To: {ticket.assignedTeam.teamName}</span>
+                          {ticket.assignedUser && (
+                            <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                              → {ticket.assignedUser.name}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {ticket.dueDate && (
                         <div className="flex items-center">
                           <Calendar className="h-4 w-4 mr-1" />
@@ -291,25 +392,39 @@ const TicketApproval = () => {
                       </div>
                     )}
                   </div>
-                  
-                  {ticket.status === 'PENDING_APPROVAL' && (
-                    <div className="flex gap-2 ml-4">
+
+                  <div className="flex gap-2 ml-4">
+                    {/* Show Approve/Reject buttons for PENDING_APPROVAL tickets */}
+                    {ticket.status === 'PENDING_APPROVAL' && (
+                      <>
+                        <button
+                          onClick={() => openApprovalModal(ticket, 'approve')}
+                          className="flex items-center justify-center rounded-xl h-10 px-4 bg-black text-white text-sm font-medium"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => openApprovalModal(ticket, 'reject')}
+                          className="flex items-center justify-center rounded-xl h-10 px-4 border border-[#dbdbdb] bg-white text-[#141414] text-sm font-medium"
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Reject
+                        </button>
+                      </>
+                    )}
+
+                    {/* Show Assign to Member button for APPROVED tickets that are not assigned to individual yet */}
+                    {ticket.status === 'APPROVED' && isTeamManager && !ticket.assignedTo && (
                       <button
-                        onClick={() => openApprovalModal(ticket, 'approve')}
-                        className="flex items-center justify-center rounded-xl h-10 px-4 bg-black text-white text-sm font-medium"
+                        onClick={() => openAssignModal(ticket)}
+                        className="flex items-center justify-center rounded-xl h-10 px-4 bg-blue-600 text-white text-sm font-medium"
                       >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Accept
+                        <User className="h-4 w-4 mr-2" />
+                        Assign to Member
                       </button>
-                      <button
-                        onClick={() => openApprovalModal(ticket, 'reject')}
-                        className="flex items-center justify-center rounded-xl h-10 px-4 border border-[#dbdbdb] bg-white text-[#141414] text-sm font-medium"
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Reject
-                      </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -332,12 +447,12 @@ const TicketApproval = () => {
                   {approvalData.action === 'approve' ? 'Accept Ticket' : 'Reject Ticket'}
                 </h3>
               </div>
-              
+
               <div className="mt-4">
                 <h4 className="text-sm font-medium text-[#141414] mb-2">
                   {selectedTicket.title}
                 </h4>
-                
+
                 {approvalData.action === 'approve' ? (
                   <div className="space-y-4">
                     <div>
@@ -346,7 +461,7 @@ const TicketApproval = () => {
                       </label>
                       <select
                         value={approvalData.priority}
-                        onChange={(e) => setApprovalData({...approvalData, priority: e.target.value})}
+                        onChange={(e) => setApprovalData({ ...approvalData, priority: e.target.value })}
                         className="mt-1 w-full px-3 py-2 border border-[#dbdbdb] rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                       >
                         <option value="LOW">Low</option>
@@ -355,7 +470,7 @@ const TicketApproval = () => {
                         <option value="URGENT">Urgent</option>
                       </select>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-[#141414]">
                         Expected Closure Date (Optional)
@@ -363,7 +478,7 @@ const TicketApproval = () => {
                       <input
                         type="datetime-local"
                         value={approvalData.expectedClosure}
-                        onChange={(e) => setApprovalData({...approvalData, expectedClosure: e.target.value})}
+                        onChange={(e) => setApprovalData({ ...approvalData, expectedClosure: e.target.value })}
                         className="mt-1 w-full px-3 py-2 border border-[#dbdbdb] rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                         min={new Date().toISOString().slice(0, 16)}
                       />
@@ -376,7 +491,7 @@ const TicketApproval = () => {
                     </label>
                     <textarea
                       value={approvalData.rejectionReason}
-                      onChange={(e) => setApprovalData({...approvalData, rejectionReason: e.target.value})}
+                      onChange={(e) => setApprovalData({ ...approvalData, rejectionReason: e.target.value })}
                       className="mt-1 w-full px-3 py-2 border border-[#dbdbdb] rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                       rows={3}
                       placeholder="Please provide a reason for rejection..."
@@ -385,7 +500,7 @@ const TicketApproval = () => {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   onClick={() => setShowApprovalModal(false)}
@@ -396,13 +511,70 @@ const TicketApproval = () => {
                 <button
                   onClick={handleApproval}
                   disabled={approvalData.action === 'reject' && !approvalData.rejectionReason}
-                  className={`flex items-center justify-center rounded-xl h-10 px-4 text-sm font-medium ${
-                    approvalData.action === 'approve' 
-                      ? 'bg-black text-white' 
-                      : 'bg-[#991B1B] text-white'
-                  } ${(approvalData.action === 'reject' && !approvalData.rejectionReason) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`flex items-center justify-center rounded-xl h-10 px-4 text-sm font-medium ${approvalData.action === 'approve'
+                    ? 'bg-black text-white'
+                    : 'bg-[#991B1B] text-white'
+                    } ${(approvalData.action === 'reject' && !approvalData.rejectionReason) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   {approvalData.action === 'approve' ? 'Accept' : 'Reject'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assignment Modal */}
+      {showAssignModal && selectedTicketForAssign && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative p-5 border w-96 shadow-lg rounded-xl bg-white">
+            <div className="mt-3">
+              <div className="flex items-center">
+                <User className="h-6 w-6 text-[#1E40AF] mr-2" />
+                <h3 className="text-lg font-medium text-[#141414]">
+                  Assign Ticket to Team Member
+                </h3>
+              </div>
+
+              <div className="mt-4">
+                <h4 className="text-sm font-medium text-[#141414] mb-2">
+                  {selectedTicketForAssign.title}
+                </h4>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#141414]">
+                    Select Team Member <span className="text-[#991B1B]">*</span>
+                  </label>
+                  <select
+                    value={assignmentData.assignedTo}
+                    onChange={(e) => setAssignmentData({ ...assignmentData, assignedTo: e.target.value })}
+                    className="mt-1 w-full px-3 py-2 border border-[#dbdbdb] rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select a team member...</option>
+                    {teamMembers.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setShowAssignModal(false)}
+                  className="flex items-center justify-center rounded-xl h-10 px-4 border border-[#dbdbdb] bg-white text-[#141414] text-sm font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAssignToMember}
+                  disabled={!assignmentData.assignedTo}
+                  className={`flex items-center justify-center rounded-xl h-10 px-4 text-sm font-medium bg-blue-600 text-white ${!assignmentData.assignedTo ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                >
+                  Assign to Member
                 </button>
               </div>
             </div>

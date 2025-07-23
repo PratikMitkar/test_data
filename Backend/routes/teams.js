@@ -16,6 +16,80 @@ const {
 
 const router = express.Router();
 
+// Get team members for team manager
+router.get('/members', authenticateToken, async (req, res) => {
+  try {
+    // Check user permissions
+    const userPermissions = await checkUserPermissions(req.user);
+    
+    if (userPermissions.role === 'team') {
+      // Team manager can see their team members
+      const team = await Team.findOne({ where: { email: req.user.email } });
+      if (team) {
+        const members = await User.findAll({
+          where: { teamId: team.id },
+          attributes: ['id', 'name', 'email'],
+          order: [['name', 'ASC']]
+        });
+        
+        // Always include the team manager themselves in the list
+        // First, try to find the team manager user record
+        let teamManager = await User.findOne({
+          where: { email: req.user.email },
+          attributes: ['id', 'name', 'email']
+        });
+        
+        let allMembers = [...members];
+        
+        // If team manager has a user record and isn't already in the list, add them
+        if (teamManager && !members.find(member => member.id === teamManager.id)) {
+          allMembers.push(teamManager);
+        } else if (!teamManager) {
+          // If team manager doesn't have a user record, create a virtual entry using team data
+          // This allows the team manager to assign tickets to themselves
+          teamManager = {
+            id: team.id, // Use team ID as user ID for assignment
+            name: team.managerName,
+            email: team.email,
+            isTeamManager: true // Flag to identify this is a team manager
+          };
+          allMembers.push(teamManager);
+        }
+        
+        // Sort again after adding team manager
+        allMembers.sort((a, b) => a.name.localeCompare(b.name));
+        
+        res.json({ members: allMembers });
+      } else {
+        res.json({ members: [] });
+      }
+    } else if (userPermissions.role === 'admin' || userPermissions.role === 'super_admin') {
+      // Admin and super admin can see all users
+      const members = await User.findAll({
+        attributes: ['id', 'name', 'email', 'teamId'],
+        include: [{
+          model: Team,
+          as: 'team',
+          attributes: ['teamName']
+        }],
+        order: [['name', 'ASC']]
+      });
+      
+      res.json({ members });
+    } else {
+      return res.status(403).json({
+        error: 'Access denied. Only team managers, admins, and super admins can access team members.'
+      });
+    }
+  } catch (error) {
+    console.error('Get team members error:', error);
+    res.status(500).json({
+      error: 'Failed to get team members',
+      message: error.message
+    });
+  }
+});
+
 // Get teams for dropdowns (authenticated users only - limited data)
 router.get('/dropdown', authenticateToken, async (req, res) => {
   try {
@@ -40,9 +114,11 @@ const checkUserPermissions = async (user) => {
   try {
     const admin = await Admin.findOne({ where: { email: user.email } });
     const superAdmin = await SuperAdmin.findOne({ where: { email: user.email } });
+    const team = await Team.findOne({ where: { email: user.email } });
     
     if (admin) return { role: 'admin', adminId: admin.id };
     if (superAdmin) return { role: 'super_admin', superAdminId: superAdmin.id };
+    if (team) return { role: 'team', teamId: team.id };
     
     return { role: 'user' };
   } catch (error) {

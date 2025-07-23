@@ -22,18 +22,18 @@ const CreateTicket = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [teams, setTeams] = useState([]);
-  const [users, setUsers] = useState([]);
+
   const [projects, setProjects] = useState([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     type: 'task',
     category: 'technical',
-    department: 'IT',
     dueDate: '',
     teamId: '',
+    assignedTeamId: '',
     projectId: '',
-    assignedTo: '',
+
     priority: 'MEDIUM',
     estimatedHours: '',
     expectedClosure: '',
@@ -47,22 +47,31 @@ const CreateTicket = () => {
 
   const fetchFormData = async () => {
     try {
-      // Fetch teams, users, and projects for dropdowns using the correct endpoints
-      const [teamsRes, usersRes, projectsRes] = await Promise.all([
+      // Fetch teams and projects for dropdowns
+      const [teamsRes, projectsRes] = await Promise.all([
         api.get('/api/teams/dropdown'),
-        api.get('/api/users/for-tickets'),
         api.get('/api/projects/dropdown')
       ]);
 
       setTeams(teamsRes.data.teams || []);
-      setUsers(usersRes.data.users || []);
       setProjects(projectsRes.data.projects || []);
 
-      // Auto-select team if user is a member
+      // Auto-select team based on user role
       if (user?.role === 'user' && user?.teamId) {
+        // Regular users are auto-assigned to their team
         setFormData(prev => ({
           ...prev,
-          teamId: user.teamId.toString()
+          teamId: user.teamId.toString(),
+          assignedTeamId: user.teamId.toString()
+        }));
+      } else if (user?.role === 'team' && user?.id) {
+        // Team managers are auto-assigned to their team as creator
+        // and can also assign to their own team if desired
+        setFormData(prev => ({
+          ...prev,
+          teamId: user.id.toString(),
+          // Auto-select their own team as the assigned team as well
+          assignedTeamId: user.id.toString()
         }));
       }
     } catch (error) {
@@ -71,12 +80,16 @@ const CreateTicket = () => {
     }
   };
 
+
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+
+    // No need to fetch team members since we removed individual assignment
   };
 
   const handleFileChange = (e) => {
@@ -108,9 +121,16 @@ const CreateTicket = () => {
     }
 
     if (!formData.teamId) {
-      toast.error('Team selection is required');
+      toast.error('Your team selection is required');
       return;
     }
+
+    if (!formData.assignedTeamId) {
+      toast.error('Please select a team to assign the task to');
+      return;
+    }
+
+    // Team managers can assign tickets to their own team (removed restriction)
 
     try {
       setLoading(true);
@@ -129,11 +149,11 @@ const CreateTicket = () => {
         description: formData.description,
         type: formData.type,
         category: formData.category,
-        department: formData.department,
         dueDate: formData.dueDate,
         teamId: parseInt(formData.teamId),
+        assignedTeamId: parseInt(formData.assignedTeamId),
         projectId: formData.projectId ? parseInt(formData.projectId) : null,
-        assignedTo: formData.assignedTo ? parseInt(formData.assignedTo) : null,
+
         priority: formData.priority,
         estimatedHours: formData.estimatedHours ? parseFloat(formData.estimatedHours) : null
       };
@@ -153,7 +173,7 @@ const CreateTicket = () => {
       if (error.response) {
         console.error('Error response data:', error.response.data);
         console.error('Error response status:', error.response.status);
-        
+
         // Extract validation error messages
         if (error.response.data.details && error.response.data.details.length > 0) {
           const errorMessages = error.response.data.details.map(detail => detail.msg).join(', ');
@@ -280,29 +300,32 @@ const CreateTicket = () => {
             </div>
           </div>
 
-          {/* Department and Due Date */}
+          {/* Assigned Team and Due Date */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
-              <label htmlFor="department" className="block text-sm font-medium text-[#141414] mb-2">
-                Department <span className="text-red-500">*</span>
+              <label htmlFor="assignedTeamId" className="block text-sm font-medium text-[#141414] mb-2">
+                Assign to Team <span className="text-red-500">*</span>
               </label>
               <select
-                id="department"
-                name="department"
-                value={formData.department}
+                id="assignedTeamId"
+                name="assignedTeamId"
+                value={formData.assignedTeamId}
                 onChange={handleInputChange}
                 className="flex h-10 w-full rounded-xl border border-[#dbdbdb] bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
                 required
               >
-                <option value="IT">IT</option>
-                <option value="HR">HR</option>
-                <option value="Finance">Finance</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Sales">Sales</option>
-                <option value="Operations">Operations</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Design">Design</option>
+                <option value="">Select a team to assign the task</option>
+                {teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.teamName}
+                    </option>
+                  ))}
               </select>
+              {user?.role === 'team' && (
+                <p className="mt-1 text-xs text-neutral-500">
+                  You can assign tickets to your own team or other teams
+                </p>
+              )}
             </div>
 
             <div>
@@ -322,11 +345,11 @@ const CreateTicket = () => {
             </div>
           </div>
 
-          {/* Team and Assignment */}
+          {/* Creator Team and Project */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
               <label htmlFor="teamId" className="block text-sm font-medium text-[#141414] mb-2">
-                Team <span className="text-red-500">*</span>
+                {user?.role === 'team' ? 'Your Team (Creator)' : 'Your Team'} <span className="text-red-500">*</span>
               </label>
               <select
                 id="teamId"
@@ -335,9 +358,9 @@ const CreateTicket = () => {
                 onChange={handleInputChange}
                 className="flex h-10 w-full rounded-xl border border-[#dbdbdb] bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
                 required
-                disabled={user?.role === 'user'} // Members are auto-assigned to their team
+                disabled={user?.role === 'user' || user?.role === 'team'} // Members and team managers are auto-assigned
               >
-                <option value="">Select a team</option>
+                <option value="">Select your team</option>
                 {teams.map((team) => (
                   <option key={team.id} value={team.id}>
                     {team.teamName}
@@ -349,30 +372,35 @@ const CreateTicket = () => {
                   You are automatically assigned to your team
                 </p>
               )}
+              {user?.role === 'team' && (
+                <p className="mt-1 text-xs text-neutral-500">
+                  You are creating this ticket on behalf of your team
+                </p>
+              )}
             </div>
 
             <div>
-              <label htmlFor="assignedTo" className="block text-sm font-medium text-[#141414] mb-2">
-                Assign To (Optional)
+              <label htmlFor="projectId" className="block text-sm font-medium text-[#141414] mb-2">
+                Project (Optional)
               </label>
               <select
-                id="assignedTo"
-                name="assignedTo"
-                value={formData.assignedTo}
+                id="projectId"
+                name="projectId"
+                value={formData.projectId}
                 onChange={handleInputChange}
                 className="flex h-10 w-full rounded-xl border border-[#dbdbdb] bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
               >
-                <option value="">Unassigned</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name} {user.role === 'admin' ? '(Admin)' : user.role === 'super_admin' ? '(Super Admin)' : ''}
+                <option value="">No Project</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name} {project.team ? `(${project.team.teamName})` : ''}
                   </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Priority and Project */}
+          {/* Priority */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
               <label htmlFor="priority" className="block text-sm font-medium text-[#141414] mb-2">
@@ -391,46 +419,27 @@ const CreateTicket = () => {
                 <option value="URGENT">Urgent</option>
               </select>
             </div>
-
+            
             <div>
-              <label htmlFor="projectId" className="block text-sm font-medium text-[#141414] mb-2">
-                Project (Optional)
+              <label htmlFor="estimatedHours" className="block text-sm font-medium text-[#141414] mb-2">
+                Estimated Hours (Optional)
               </label>
-              <select
-                id="projectId"
-                name="projectId"
-                value={formData.projectId}
+              <input
+                type="number"
+                id="estimatedHours"
+                name="estimatedHours"
+                value={formData.estimatedHours}
                 onChange={handleInputChange}
                 className="flex h-10 w-full rounded-xl border border-[#dbdbdb] bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
-              >
-                <option value="">No Project</option>
-                {projects
-                  .filter(project => !formData.teamId || project.teamId === parseInt(formData.teamId) || project.teamId === null)
-                  .map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-              </select>
+                placeholder="Enter estimated hours"
+                min="0"
+                step="0.5"
+              />
             </div>
           </div>
 
-          {/* Estimated Hours */}
-          <div>
-            <label htmlFor="estimatedHours" className="block text-sm font-medium text-[#141414] mb-2">
-              Estimated Hours (Optional)
-            </label>
-            <input
-              type="number"
-              id="estimatedHours"
-              name="estimatedHours"
-              value={formData.estimatedHours}
-              onChange={handleInputChange}
-              className="flex h-10 w-full rounded-xl border border-[#dbdbdb] bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
-              placeholder="Enter estimated hours"
-              min="0"
-              step="0.5"
-            />
+          {/* Placeholder for spacing */}
+          <div className="hidden">
           </div>
 
           {/* Expected Closure Date */}
